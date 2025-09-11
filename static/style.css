@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #121212;
+    color: #fff;
+    margin: 0; padding: 0;
+    display: flex; flex-direction: column; align-items: center;
+}
+
+h1 { color:#ff3b3f; margin:30px 0 40px; }
+
+.dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+    gap: 20px; width:90%; max-width:1200px; margin-bottom: 30px;
+}
+
+.card {
+    background: #1e1e1e; border-radius: 15px; box-shadow:0 8px 20px rgba(0,0,0,0.5);
+    padding: 20px; display:flex; flex-direction: column; align-items: center;
+    transition: transform 0.2s;
+}
+
+.card:hover { transform: translateY(-5px); }
+.card p { margin:10px 0; font-size:1.05em; color:#ddd; text-align:center; }
+.card h3 { margin: 0 0 10px 0; color:#ff6b6b; }
+.value { font-size:2em; font-weight:bold; margin-top:10px; }
+
+.progress-circle {
+    position: relative; width: 80px; height: 80px; border-radius: 50%;
+    background: conic-gradient(#ff3b3f 0%, #444 0%);
+    display: flex; align-items: center; justify-content: center; margin-top:15px;
+}
+
+.progress-circle span { position: absolute; font-size:1em; font-weight:bold; color:#fff; }
+
+.tyres-grid {
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px;
+}
+
+/* Alerte visuelle ERS */
+#ers-alert {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #ff3b3f;
+    color: white;
+    font-size: 1.2em;
+    padding: 10px 20px;
+    border-radius: 10px;
+    display: none;
+    z-index: 999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+}
+
+/* ---- Styles pour la section d'analyse ---- */
+.analysis { width: 92%; max-width: 1200px; margin-bottom: 60px; }
+.analysis-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 18px; }
+.card.wide { grid-column: 1 / -1; align-items: flex-start; }
+.sectors-table, .compare-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.sectors-table th, .sectors-table td, .compare-table th, .compare-table td { border: 1px solid #2b2b2b; padding: 8px; text-align: center; font-size: 0.95em; }
+.compare-table thead th { background: linear-gradient(90deg,#2a2a2a,#222); color: #fff; font-weight:700; }
+.col-title { text-align:left; padding-left:12px; font-weight:700; color:#ffb4b4; }
+.improved { background: linear-gradient(90deg, rgba(40,167,69,0.12), transparent); border-radius:6px; color:#b8ffbf; }
+
+/* Responsive tweaks */
+@media (max-width: 720px){
+    h1 { font-size: 1.4em; margin-top: 18px; }
+    .progress-circle { width: 64px; height: 64px; }
+}
