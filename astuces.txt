@@ -8,3 +8,4 @@ afficher les attributs dun objet
 
         print("Lap attributes:", dir(lap))
         print("Ahead lap attributes:", dir(ahead_lap))
+        test
