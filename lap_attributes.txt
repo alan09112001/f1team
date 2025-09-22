@@ -1,0 +1,156 @@
+=== Attributs Lap ===
+car_position: 4
+corner_cutting_warnings: 0
+current_lap_invalid: 0
+current_lap_num: 1
+current_lap_time_in_ms: 22100
+delta_to_car_in_front_in_ms: 150
+delta_to_race_leader_in_ms: 367
+driver_status: 4
+get_value: <bound method PacketMixin.get_value of {
+  "car_position": 4,
+  "corner_cutting_warnings": 0,
+  "current_lap_invalid": 0,
+  "current_lap_num": 1,
+  "current_lap_time_in_ms": 22100,
+  "delta_to_car_in_front_in_ms": 150,
+  "delta_to_race_leader_in_ms": 367,
+  "driver_status": 4,
+  "grid_position": 1,
+  "lap_distance": 1322.901,
+  "last_lap_time_in_ms": 0,
+  "num_pit_stops": 0,
+  "num_unserved_drive_through_pens": 0,
+  "num_unserved_stop_go_pens": 0,
+  "penalties": 0,
+  "pit_lane_time_in_lane_in_ms": 0,
+  "pit_lane_timer_active": 0,
+  "pit_status": 0,
+  "pit_stop_should_serve_pen": 0,
+  "pit_stop_timer_in_ms": 0,
+  "result_status": 2,
+  "safety_car_delta": -0.0,
+  "sector": 1,
+  "sector_1_time_in_ms": 20532,
+  "sector_1_time_minutes": 0,
+  "sector_2_time_in_ms": 0,
+  "sector_2_time_minutes": 0,
+  "total_distance": 1322.901,
+  "total_warnings": 0
+}>
+grid_position: 1
+lap_distance: 1322.9013671875
+last_lap_time_in_ms: 0
+num_pit_stops: 0
+num_unserved_drive_through_pens: 0
+num_unserved_stop_go_pens: 0
+pack: <bound method PacketMixin.pack of {
+  "car_position": 4,
+  "corner_cutting_warnings": 0,
+  "current_lap_invalid": 0,
+  "current_lap_num": 1,
+  "current_lap_time_in_ms": 22100,
+  "delta_to_car_in_front_in_ms": 150,
+  "delta_to_race_leader_in_ms": 367,
+  "driver_status": 4,
+  "grid_position": 1,
+  "lap_distance": 1322.901,
+  "last_lap_time_in_ms": 0,
+  "num_pit_stops": 0,
+  "num_unserved_drive_through_pens": 0,
+  "num_unserved_stop_go_pens": 0,
+  "penalties": 0,
+  "pit_lane_time_in_lane_in_ms": 0,
+  "pit_lane_timer_active": 0,
+  "pit_status": 0,
+  "pit_stop_should_serve_pen": 0,
+  "pit_stop_timer_in_ms": 0,
+  "result_status": 2,
+  "safety_car_delta": -0.0,
+  "sector": 1,
+  "sector_1_time_in_ms": 20532,
+  "sector_1_time_minutes": 0,
+  "sector_2_time_in_ms": 0,
+  "sector_2_time_minutes": 0,
+  "total_distance": 1322.901,
+  "total_warnings": 0
+}>
+penalties: 0
+pit_lane_time_in_lane_in_ms: 0
+pit_lane_timer_active: 0
+pit_status: 0
+pit_stop_should_serve_pen: 0
+pit_stop_timer_in_ms: 0
+result_status: 2
+safety_car_delta: -0.0
+sector: 1
+sector_1_time_in_ms: 20532
+sector_1_time_minutes: 0
+sector_2_time_in_ms: 0
+sector_2_time_minutes: 0
+size: <bound method PacketMixin.size of <class 'f1_23_telemetry.packets.LapData'>>
+to_dict: <bound method PacketMixin.to_dict of {
+  "car_position": 4,
+  "corner_cutting_warnings": 0,
+  "current_lap_invalid": 0,
+  "current_lap_num": 1,
+  "current_lap_time_in_ms": 22100,
+  "delta_to_car_in_front_in_ms": 150,
+  "delta_to_race_leader_in_ms": 367,
+  "driver_status": 4,
+  "grid_position": 1,
+  "lap_distance": 1322.901,
+  "last_lap_time_in_ms": 0,
+  "num_pit_stops": 0,
+  "num_unserved_drive_through_pens": 0,
+  "num_unserved_stop_go_pens": 0,
+  "penalties": 0,
+  "pit_lane_time_in_lane_in_ms": 0,
+  "pit_lane_timer_active": 0,
+  "pit_status": 0,
+  "pit_stop_should_serve_pen": 0,
+  "pit_stop_timer_in_ms": 0,
+  "result_status": 2,
+  "safety_car_delta": -0.0,
+  "sector": 1,
+  "sector_1_time_in_ms": 20532,
+  "sector_1_time_minutes": 0,
+  "sector_2_time_in_ms": 0,
+  "sector_2_time_minutes": 0,
+  "total_distance": 1322.901,
+  "total_warnings": 0
+}>
+to_json: <bound method PacketMixin.to_json of {
+  "car_position": 4,
+  "corner_cutting_warnings": 0,
+  "current_lap_invalid": 0,
+  "current_lap_num": 1,
+  "current_lap_time_in_ms": 22100,
+  "delta_to_car_in_front_in_ms": 150,
+  "delta_to_race_leader_in_ms": 367,
+  "driver_status": 4,
+  "grid_position": 1,
+  "lap_distance": 1322.901,
+  "last_lap_time_in_ms": 0,
+  "num_pit_stops": 0,
+  "num_unserved_drive_through_pens": 0,
+  "num_unserved_stop_go_pens": 0,
+  "penalties": 0,
+  "pit_lane_time_in_lane_in_ms": 0,
+  "pit_lane_timer_active": 0,
+  "pit_status": 0,
+  "pit_stop_should_serve_pen": 0,
+  "pit_stop_timer_in_ms": 0,
+  "result_status": 2,
+  "safety_car_delta": -0.0,
+  "sector": 1,
+  "sector_1_time_in_ms": 20532,
+  "sector_1_time_minutes": 0,
+  "sector_2_time_in_ms": 0,
+  "sector_2_time_minutes": 0,
+  "total_distance": 1322.901,
+  "total_warnings": 0
+}>
+total_distance: 1322.9013671875
+total_warnings: 0
+unpack: <bound method PacketMixin.unpack of <class 'f1_23_telemetry.packets.LapData'>>

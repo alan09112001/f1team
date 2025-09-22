@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Données LapData</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // connexion explicite au backend Flask-SocketIO
+      const socket = io("http://localhost:5000");
+
+      function formatVal(v){
+        if(v === undefined || v === null) return 0;
+        if(typeof v === "number"){
+          return Number(v).toFixed(3).replace(/\.000$/,""); // affiche joliment les floats
+        }
+        return v;
+      }
+
+      socket.on("update", data => {
+        document.getElementById("current_lap_num").innerText = formatVal(data.current_lap_num);
+        document.getElementById("current_lap_time_in_ms").innerText = formatVal(data.current_lap_time_in_ms);
+        document.getElementById("last_lap_time_in_ms").innerText = formatVal(data.last_lap_time_in_ms);
+        document.getElementById("lap_distance").innerText = formatVal(data.lap_distance);
+        document.getElementById("total_distance").innerText = formatVal(data.total_distance);
+        document.getElementById("car_position").innerText = formatVal(data.car_position);
+        document.getElementById("grid_position").innerText = formatVal(data.grid_position);
+        document.getElementById("sector").innerText = formatVal(data.sector);
+        document.getElementById("sector_1_time_in_ms").innerText = formatVal(data.sector_1_time_in_ms);
+        document.getElementById("sector_2_time_in_ms").innerText = formatVal(data.sector_2_time_in_ms);
+        document.getElementById("corner_cutting_warnings").innerText = formatVal(data.corner_cutting_warnings);
+        document.getElementById("penalties").innerText = formatVal(data.penalties);
+        document.getElementById("num_pit_stops").innerText = formatVal(data.num_pit_stops);
+        document.getElementById("pit_status").innerText = formatVal(data.pit_status);
+        document.getElementById("driver_status").innerText = formatVal(data.driver_status);
+        document.getElementById("result_status").innerText = formatVal(data.result_status);
+        document.getElementById("safety_car_delta").innerText = formatVal(data.safety_car_delta);
+      });
+    });
+  </script>
+  <style>
+    body { font-family: 'Roboto', sans-serif; background:#121212; color:#fff; padding:20px; }
+    h1 { color:#ff3b3f; margin-bottom:20px; }
+    table { border-collapse: collapse; width:100%; max-width:800px; margin:auto; background:#1e1e1e; border-radius:10px; overflow:hidden; }
+    th, td { border:1px solid #333; padding:8px 12px; text-align:center; }
+    th { background:#2a2a2a; color:#ffb4b4; }
+    tr:nth-child(even){ background:#181818; }
+  </style>
+</head>
+<body>
+  <h1>Données LapData</h1>
+  <table>
+    <tr><th>Attribut</th><th>Valeur</th></tr>
+    <tr><td>Tour actuel</td><td id="current_lap_num">0</td></tr>
+    <tr><td>Temps tour actuel (ms)</td><td id="current_lap_time_in_ms">0</td></tr>
+    <tr><td>Temps dernier tour (ms)</td><td id="last_lap_time_in_ms">0</td></tr>
+    <tr><td>Distance tour</td><td id="lap_distance">0</td></tr>
+    <tr><td>Distance totale</td><td id="total_distance">0</td></tr>
+    <tr><td>Position</td><td id="car_position">0</td></tr>
+    <tr><td>Position grille</td><td id="grid_position">0</td></tr>
+    <tr><td>Secteur</td><td id="sector">0</td></tr>
+    <tr><td>Secteur 1 (ms)</td><td id="sector_1_time_in_ms">0</td></tr>
+    <tr><td>Secteur 2 (ms)</td><td id="sector_2_time_in_ms">0</td></tr>
+    <tr><td>Avertissements cut</td><td id="corner_cutting_warnings">0</td></tr>
+    <tr><td>Pénalités</td><td id="penalties">0</td></tr>
+    <tr><td>Arrêts aux stands</td><td id="num_pit_stops">0</td></tr>
+    <tr><td>Status stand</td><td id="pit_status">0</td></tr>
+    <tr><td>Status pilote</td><td id="driver_status">0</td></tr>
+    <tr><td>Status résultat</td><td id="result_status">0</td></tr>
+    <tr><td>Delta safety car</td><td id="safety_car_delta">0</td></tr>
+  </table>
+</body>
+</html>
