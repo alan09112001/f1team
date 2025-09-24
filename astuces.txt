@@ -9,3 +9,39 @@ afficher les attributs dun objet
         print("Lap attributes:", dir(lap))
         print("Ahead lap attributes:", dir(ahead_lap))
         test
+
+
+# 1️⃣ Ajouter tous les fichiers modifiés
+git add .
+
+# 2️⃣ Créer un commit avec un message
+git commit -m "Ton message de commit ici"
+
+# 3️⃣ Pousser sur le dépôt distant
+git push origin main
+
+git add .
+git commit -m "Ton message de commit ici"
+git push origin main
+
+
+# 1️⃣ Cloner le dépôt depuis GitHub
+git clone https://github.com/alan09112001/f1team.git
+
+# 2️⃣ Se déplacer dans le dossier du projet
+cd f1team
+
+# 3️⃣ Vérifier la branche actuelle
+git branch
+
+# 4️⃣ Ajouter tous les fichiers modifiés
+git add .
+
+# 5️⃣ Créer un commit avec un message
+git commit -m "Ton message de commit ici"
+
+# 6️⃣ Récupérer les derniers changements du dépôt distant (pour éviter les conflits)
+git pull origin main
+
+# 7️⃣ Pousser ton commit sur GitHub
+git push origin main
