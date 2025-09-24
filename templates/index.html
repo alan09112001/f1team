@@ -1,118 +1,67 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<title>Dashboard F1</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-    const socket = io();
-    const alertBox = document.getElementById("ers-alert");
-
-    function updateCircle(el, value){
-        // clamp 0..100
-        const v = Math.max(0, Math.min(100, Math.round(value)));
-        el.style.background = `conic-gradient(#ff3b3f ${v}%, #444 ${v}%)`;
-        el.querySelector('span').innerText = v + '%';
-    }
-
-    let lastAheadMode = null;
-
-    socket.on('update', data => {
-        // MA voiture
-        document.getElementById("speed").innerText = (data.speed || 0) + " km/h";
-        document.getElementById("gear").innerText = (data.gear || 0);
-        document.getElementById("rpm").innerText = (data.engine_rpm || 0);
-        updateCircle(document.getElementById("throttle-circle"), (data.throttle || 0) * 100);
-        updateCircle(document.getElementById("brake-circle"), (data.brake || 0) * 100);
-        document.getElementById("ers").innerText = (data.ers_store_energy !== undefined ? Number(data.ers_store_energy).toFixed(0) : "0") + " %";
-
-        const tyres = data.tyres_wear || [0,0,0,0];
-        ["fl","fr","rl","rr"].forEach((t,i)=>{ updateCircle(document.getElementById("tyre-"+t), Math.round(tyres[i] || 0)); });
-
-        // Voiture devant
-        document.getElementById("ahead_speed").innerText = (data.ahead_speed || 0) + " km/h";
-        document.getElementById("ahead_gear").innerText = (data.ahead_gear || 0);
-        document.getElementById("ahead_rpm").innerText = (data.ahead_engine_rpm || 0);
-        updateCircle(document.getElementById("ahead_throttle-circle"), (data.ahead_throttle || 0) * 100);
-        updateCircle(document.getElementById("ahead_brake-circle"), (data.ahead_brake || 0) * 100);
-        document.getElementById("ahead_ers").innerText = (data.ahead_ers_store_energy !== undefined ? Number(data.ahead_ers_store_energy).toFixed(0) : "0") + " %";
-
-        const ahead_tyres = data.ahead_tyres_wear || [0,0,0,0];
-        ["fl","fr","rl","rr"].forEach((t,i)=>{ updateCircle(document.getElementById("ahead_tyre-"+t), Math.round(ahead_tyres[i] || 0)); });
-
-        // Alerte ERS IA
-        if(data.ahead_ers_mode !== undefined && data.ahead_ers_mode !== lastAheadMode){
-            lastAheadMode = data.ahead_ers_mode;
-            alertBox.innerText = `⚡ Mode ERS IA devant : ${lastAheadMode}`;
-            alertBox.style.display = "block";
-            setTimeout(()=>{ alertBox.style.display = "none"; }, 2000);
-        }
-
-    });
-});
-</script>
+  <meta charset="UTF-8">
+  <title>Packets F1 23</title>
+  <style>
+    body { font-family: sans-serif; background:#121212; color:#fff; padding:20px; }
+    h1 { color:#ff3b3f; margin-bottom:20px; }
+    select { margin-bottom:20px; padding:6px 10px; border-radius:6px; background:#1e1e1e; color:#fff; border:1px solid #333; }
+    ul { padding:0; list-style:none; transition: all 0.3s; }
+    ul.brut li { margin:4px 0; }
+    ul.ameliore { display:flex; flex-wrap:wrap; gap:15px; }
+    ul.ameliore li { background:#1e1e1e; padding:12px 18px; border-radius:10px; min-width:180px; text-align:center; }
+    a { color:#ff6b6b; font-weight:700; text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    .packet-name { display:block; margin-top:6px; color:#bbb; font-size:0.95em; }
+  </style>
 </head>
 <body>
-<h1>Dashboard F1 (Temps réel)</h1>
-<div id="ers-alert"></div>
+  <h1>Packets UDP F1 23</h1>
 
-<h2>Ma voiture</h2>
-<div class="dashboard">
-    <div class="card"><p>Vitesse</p><div class="value" id="speed">0 km/h</div></div>
-    <div class="card"><p>Rapport</p><div class="value" id="gear">0</div></div>
-    <div class="card"><p>RPM</p><div class="value" id="rpm">0</div></div>
-    <div class="card"><p>Accélérateur</p><div class="progress-circle" id="throttle-circle"><span>0%</span></div></div>
-    <div class="card"><p>Frein</p><div class="progress-circle" id="brake-circle"><span>0%</span></div></div>
-    <div class="card"><p>ERS</p><div class="value" id="ers">100%</div></div>
-    <div class="card"><p>Pneus</p>
-        <div class="tyres-grid">
-            <div class="progress-circle" id="tyre-fl"><span>0%</span></div>
-            <div class="progress-circle" id="tyre-fr"><span>0%</span></div>
-            <div class="progress-circle" id="tyre-rl"><span>0%</span></div>
-            <div class="progress-circle" id="tyre-rr"><span>0%</span></div>
-        </div>
-    </div>
-</div>
+  <label for="viewMode">Mode d'affichage :</label>
+  <select id="viewMode">
+    <option value="brut" selected>Brut</option>
+    <option value="ameliore">Amélioré</option>
+  </select>
 
-<h2>Voiture devant</h2>
-<div class="dashboard">
-    <div class="card"><p>Vitesse</p><div class="value" id="ahead_speed">0 km/h</div></div>
-    <div class="card"><p>Rapport</p><div class="value" id="ahead_gear">0</div></div>
-    <div class="card"><p>RPM</p><div class="value" id="ahead_rpm">0</div></div>
-    <div class="card"><p>Accélérateur</p><div class="progress-circle" id="ahead_throttle-circle"><span>0%</span></div></div>
-    <div class="card"><p>Frein</p><div class="progress-circle" id="ahead_brake-circle"><span>0%</span></div></div>
-    <div class="card"><p>ERS</p><div class="value" id="ahead_ers">100%</div></div>
-    <div class="card"><p>Pneus</p>
-        <div class="tyres-grid">
-            <div class="progress-circle" id="ahead_tyre-fl"><span>0%</span></div>
-            <div class="progress-circle" id="ahead_tyre-fr"><span>0%</span></div>
-            <div class="progress-circle" id="ahead_tyre-rl"><span>0%</span></div>
-            <div class="progress-circle" id="ahead_tyre-rr"><span>0%</span></div>
-        </div>
-    </div>
-</div>
+  <ul id="packetList" class="brut">
+    {% set names = {
+      0:"Motion",
+      1:"Session",
+      2:"Lap Data",
+      3:"Event",
+      4:"Participants",
+      5:"Car Setups",
+      6:"Car Telemetry",
+      7:"Car Status",
+      8:"Final Classification",
+      9:"Lobby Info",
+      10:"Car Damage",
+      11:"Session History",
+      12:"Tyre Sets"
+    } %}
+    {% for i in range(13) %}
+      <li>
+        <a href="/packet/{{ i }}">Packet {{ i }}</a>
+        <span class="packet-name">{{ names.get(i, "Inconnu") }}</span>
+      </li>
+    {% endfor %}
+  </ul>
 
-<h2>Comparatif Tours & Secteurs</h2>
-<div class="analysis">
-    <table class="compare-table">
-        <thead>
-            <tr>
-                <th>Tour</th>
-                <th>Voiture</th>
-                <th>Temps tour</th>
-                <th>Meilleur tour</th>
-                <th>Vitesse moyenne (km/h)</th>
-                <th>S1</th>
-                <th>S2</th>
-                <th>S3</th>
-            </tr>
-        </thead>
-        <tbody id="compare-table-body">
-            <tr><td colspan="8">En attente des données...</td></tr>
-        </tbody>
-    </table>
-</div>
+  <script>
+    const select = document.getElementById('viewMode');
+    const list = document.getElementById('packetList');
+
+    select.addEventListener('change', () => {
+      if(select.value === 'brut') {
+        list.classList.remove('ameliore');
+        list.classList.add('brut');
+      } else {
+        list.classList.remove('brut');
+        list.classList.add('ameliore');
+      }
+    });
+  </script>
 </body>
 </html>

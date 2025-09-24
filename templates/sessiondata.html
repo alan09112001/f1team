@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Données SessionData</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" crossorigin="anonymous"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const socket = io("http://localhost:5000");
+      const tableBody = document.getElementById("session-body");
+
+      socket.on("update", data => {
+        tableBody.innerHTML = "";
+        for (const [key, val] of Object.entries(data)) {
+          const tr = document.createElement("tr");
+          const tdKey = document.createElement("td");
+          tdKey.textContent = key;
+          const tdVal = document.createElement("td");
+          tdVal.textContent = (typeof val === "object") ? JSON.stringify(val) : val;
+          tr.appendChild(tdKey);
+          tr.appendChild(tdVal);
+          tableBody.appendChild(tr);
+        }
+      });
+    });
+  </script>
+  <style>
+    body { font-family: 'Roboto', sans-serif; background:#121212; color:#fff; padding:20px; }
+    h1 { color:#ff3b3f; margin-bottom:20px; }
+    table { border-collapse: collapse; width:100%; max-width:900px; margin:auto; background:#1e1e1e; border-radius:10px; overflow:hidden; }
+    th, td { border:1px solid #333; padding:8px 12px; text-align:left; }
+    th { background:#2a2a2a; color:#ffb4b4; }
+    tr:nth-child(even){ background:#181818; }
+  </style>
+</head>
+<body>
+  <h1>Données SessionData (complet)</h1>
+  <table>
+    <thead>
+      <tr><th>Attribut</th><th>Valeur</th></tr>
+    </thead>
+    <tbody id="session-body">
+      <tr><td colspan="2">En attente des données...</td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

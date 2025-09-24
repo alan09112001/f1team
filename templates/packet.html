@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Packet {{ packet_id }}</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    body { font-family: sans-serif; background:#121212; color:#fff; padding:20px; }
+    h1 { color:#ff3b3f; }
+    select { margin-bottom:20px; padding:6px 10px; border-radius:6px; background:#1e1e1e; color:#fff; border:1px solid #333; }
+
+    /* JSON brut */
+    pre.brut { background:#1e1e1e; padding:12px; border-radius:8px; overflow:auto; max-height:600px; }
+
+    /* Table améliorée */
+    table.ameliore { border-collapse: separate; border-spacing:0; width:100%; max-width:900px; margin-top:20px; background:#1e1e1e; border-radius:10px; overflow:hidden; }
+    table.ameliore th, table.ameliore td { padding:10px 12px; text-align:center; }
+    table.ameliore th { background:#2a2a2a; color:#ffb4b4; font-weight:700; }
+    table.ameliore tr:nth-child(even) { background:#222; }
+    table.ameliore tr:nth-child(odd) { background:#181818; }
+    table.ameliore td:first-child { font-weight:600; color:#ff6b6b; }
+
+    /* Mini-tables pour objets imbriqués */
+    table.ameliore table { margin:0 auto; font-size:0.9em; border-collapse:collapse; }
+    table.ameliore table td { border:none; padding:2px 6px; text-align:left; }
+    ul { margin:0; padding-left:15px; }
+    ul li { list-style-type: disc; margin-left:10px; }
+  </style>
+</head>
+<body>
+  <h1>Packet {{ packet_id }}</h1>
+  <p>
+    {% set names = {
+      0:"Motion",
+      1:"Session",
+      2:"Lap Data",
+      3:"Event",
+      4:"Participants",
+      5:"Car Setups",
+      6:"Car Telemetry",
+      7:"Car Status",
+      8:"Final Classification",
+      9:"Lobby Info",
+      10:"Car Damage",
+      11:"Session History",
+      12:"Tyre Sets"
+    } %}
+    <strong>{{ names.get(packet_id, "Inconnu") }}</strong>
+  </p>
+
+  <label for="viewMode">Mode d'affichage :</label>
+  <select id="viewMode">
+    <option value="brut" selected>Brut</option>
+    <option value="ameliore">Amélioré</option>
+  </select>
+
+  <!-- Conteneurs pour les deux affichages -->
+  <pre id="jsonView" class="brut">En attente de données...</pre>
+  <table id="tableView" class="ameliore" style="display:none;">
+    <thead><tr><th>Attribut</th><th>Valeur</th></tr></thead>
+    <tbody id="packet-body"></tbody>
+  </table>
+
+  <script>
+    const socket = io("http://localhost:5000");
+    const viewSelect = document.getElementById('viewMode');
+    const jsonView = document.getElementById('jsonView');
+    const tableView = document.getElementById('tableView');
+    const tbody = document.getElementById('packet-body');
+
+    // Fonction récursive pour formater toutes les valeurs
+    function formatValue(val) {
+      if(val === null || val === undefined) return "-";
+
+      // Nombre
+      if(typeof val === "number") return val.toLocaleString(undefined,{maximumFractionDigits:3});
+
+      // Tableau
+      if(Array.isArray(val)) {
+        let html = '<ul>';
+        for(const item of val) {
+          html += `<li>${formatValue(item)}</li>`;
+        }
+        html += '</ul>';
+        return html;
+      }
+
+      // Objet
+      if(typeof val === "object") {
+        let html = '<table>';
+        for(const [k,v] of Object.entries(val)) {
+          html += `<tr><td style="font-weight:600; color:#ff6b6b">${k}</td><td>${formatValue(v)}</td></tr>`;
+        }
+        html += '</table>';
+        return html;
+      }
+
+      // String ou autre
+      return val;
+    }
+
+    // Gestion du sélecteur
+    viewSelect.addEventListener('change', () => {
+      if(viewSelect.value === 'brut'){
+        jsonView.style.display = 'block';
+        tableView.style.display = 'none';
+      } else {
+        jsonView.style.display = 'none';
+        tableView.style.display = 'table';
+      }
+    });
+
+    // Mise à jour des données
+    socket.on("packet_{{ packet_id }}", data => {
+      // JSON brut
+      jsonView.textContent = JSON.stringify(data, null, 2);
+
+      // Table améliorée
+      tbody.innerHTML = '';
+      for(const [key,val] of Object.entries(data)) {
+        const tr = document.createElement('tr');
+        const tdKey = document.createElement('td');
+        tdKey.textContent = key;
+        const tdVal = document.createElement('td');
+        tdVal.innerHTML = formatValue(val);
+        tr.appendChild(tdKey);
+        tr.appendChild(tdVal);
+        tbody.appendChild(tr);
+      }
+    });
+  </script>
+</body>
+</html>
