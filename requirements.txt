@@ -1,0 +1,5 @@
+flask
+flask-socketio
+eventlet
+f1-23-telemetry
+scapy

@@ -18,6 +18,12 @@ def show_packet(packet_id):
     """Affiche dynamiquement les données d’un packet"""
     return render_template("packet.html", packet_id=packet_id)
 
+@app.route("/analyse")
+def analyse():
+    """Page d'analyse (vide pour l'instant)"""
+    return render_template("analyse.html")
+
+
 def telemetry_listener():
     listener = TelemetryListener(port=20777, host="0.0.0.0")
     print("En attente de données UDP depuis F1 23...")

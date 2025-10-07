@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  f1_telemetry:
+    build: .
+    container_name: f1_telemetry_app
+    ports:
+      - "5000:5000"         # Flask
+      - "20777:20777/udp"   # UDP F1 23
+    volumes:
+      - .:/app              # Monte ton code local (utile pour le dev)
+    restart: unless-stopped
