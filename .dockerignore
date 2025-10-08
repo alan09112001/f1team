@@ -1,9 +1,0 @@
-__pycache__/
-*.pyc
-*.pyo
-*.pcap
-*.log
-.env
-.git
-.gitignore
-venv/

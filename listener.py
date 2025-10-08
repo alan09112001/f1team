@@ -1,3 +1,4 @@
+# path: listener.py
 from f1_23_telemetry.listener import TelemetryListener
 from flask import Flask, render_template
 from flask_socketio import SocketIO
@@ -23,22 +24,19 @@ def analyse():
     """Page d'analyse (vide pour l'instant)"""
     return render_template("analyse.html")
 
-
 def telemetry_listener():
     listener = TelemetryListener(port=20777, host="0.0.0.0")
     print("En attente de données UDP depuis F1 23...")
-
     while True:
         try:
             packet = listener.get()
             pid = packet.header.packet_id
-
             # stocke le dict complet
             packets_data[pid] = packet.to_dict()
-
             # envoie au front
             socketio.emit(f"packet_{pid}", packets_data[pid])
-
+            # Debug console pour vérifier la réception
+            print(f"Paquet reçu : {pid} du joueur {getattr(packet.header, 'player_car_index', 'N/A')}")
         except KeyboardInterrupt:
             print("\nArrêt du listener")
             break

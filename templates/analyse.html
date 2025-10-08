@@ -79,7 +79,7 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const tbody = document.querySelector("#analyse-table tbody");
-  const socket = io("http://localhost:5000");
+  const socket = io("http://192.168.1.15:5000");
 
   const playersDiv = document.getElementById("players");
   let selectedPlayerIndex = null;  
