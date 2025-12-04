@@ -23,6 +23,10 @@ def show_packet(packet_id):
 def analyse():
     """Page d'analyse (vide pour l'instant)"""
     return render_template("analyse.html")
+@app.route("/analyseers")
+def analyseers():
+    """Page d'analyse (vide pour l'instant)"""
+    return render_template("analyseers.html")
 
 def telemetry_listener():
     listener = TelemetryListener(port=20777, host="0.0.0.0")

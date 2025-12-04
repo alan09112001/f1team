@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Analyse ERS - Comparatif</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: 'Roboto', sans-serif; background:#121212; color:#fff; padding:20px; }
+    h1 { color:#ff3b3f; margin-bottom:20px; text-align:center; }
+    #players { width: 95%; max-width: 1000px; margin: auto; margin-bottom: 25px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    #players .player { background:#1e1e1e; padding:8px 14px; border-radius:10px; font-size:0.9em; color:#ffb4b4; border:1px solid #333; cursor:pointer; user-select:none; }
+    #players .player.selected { border:2px solid #ffa500; color:#ffa500; }
+    .chart-container { width:95%; max-width:1000px; margin:auto; margin-bottom:30px; }
+    canvas { background-color: #ffffff !important; border-radius: 6px; box-shadow: 0 0 10px rgba(0,0,0,0.4); }
+    #points-counter { text-align:center; margin-bottom:10px; font-size:1em; color:#ffa500; }
+    table { border-collapse: collapse; width:90%; max-width:1000px; margin:auto; background:#1e1e1e; border-radius:10px; overflow:hidden; margin-bottom:50px; }
+    th, td { border:1px solid #333; padding:8px 12px; text-align:center; }
+    th { background:#2a2a2a; color:#ffb4b4; }
+    tr:nth-child(even){ background:#181818; }
+    tr.selected { background: #333333; color:#ffa500; }
+    #testVoice { display:block; margin:auto; margin-bottom:20px; padding:8px 15px; border-radius:5px; border:none; background:#ffa500; color:#121212; cursor:pointer; font-weight:bold; }
+  </style>
+</head>
+<body>
+
+<h1>Analyse ERS - Comparatif</h1>
+
+<div id="players">Chargement des joueurs...</div>
+
+<div class="chart-container"><canvas id="ersChart" height="100"></canvas></div>
+
+<div id="points-counter">Points total : 0</div>
+
+<table id="analyse-table">
+  <thead>
+    <tr>
+      <th>Distance (m)</th>
+      <th>ERS Mode</th>
+      <th>Activation durée (s)</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<button id="testVoice">Parler</button>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  //const socket = io("http://192.168.1.14:5000");
+  const socket = io(`http://${window.location.hostname}:5000`);
+  const playersDiv = document.getElementById("players");
+  const tbody = document.querySelector("#analyse-table tbody");
+  const pointsCounter = document.getElementById("points-counter");
+
+  let selectedPlayerIndex = null;
+  let myPlayerIndex = null;
+  let trackLength = 7004;
+  let latestDistance = 0;
+  let selLatestDistance = 0;
+
+  const ersModes = ['Non', 'Intermédiaire', 'Chrono', 'Dépassement'];
+
+  let myDataPoints = [];
+  let selDataPoints = [];
+  let lastErsMode = null, lastErsModeSel = null;
+  let activationStartTime = null, activationStartTimeSel = null;
+  let activationInterval = null, activationIntervalSel = null;
+
+  // --- Variables pour annonces vocales ---
+  let lastLapNum = null;
+  const announceZones = [
+    { distance: -300, message: "Mode dépassement pendant une demie seconde quand t'es à 280", announced: false },
+    { distance: 100, message: "Mode dépassement pendant 1 seconde après le virage 1", announced: false },
+    { distance: 560, message: "Mode dépassement pendant une demie seconde quand t'es à 280", announced: false },
+    { distance: 1100, message: "Mode dépassement pendant 2 secondes et demie après le virage 2", announced: false },
+    { distance: 1500, message: "Mode dépassement pendant une demie seconde quand t'es à 280", announced: false },
+    { distance: 1900, message: "Mode dépassement pendant 1 seconde après le virage 3", announced: false },
+    { distance: 3200, message: "Mode dépassement jusqu'à l'arrivée à l'entrée du prochain virage", announced: false }
+  ];
+
+  function speak(text) {
+    const voices = speechSynthesis.getVoices();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "fr-FR";
+    utter.voice = voices.find(v => v.lang === "fr-FR" && v.name.toLowerCase().includes("male")) || voices[0];
+    utter.rate = 1.0;
+    speechSynthesis.speak(utter);
+  }
+
+  // --- Déclenchement automatique initial pour autoriser Chrome à parler ---
+  speak("Allez en piste !");
+
+  function refreshTable() {
+    tbody.innerHTML = "";
+    myDataPoints.forEach(dp => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${dp.distance}</td><td>${dp.mode}</td><td>${dp.activationDuration.toFixed(2)}</td>`;
+      tbody.appendChild(tr);
+    });
+    selDataPoints.forEach(dp => {
+      const tr = document.createElement("tr");
+      tr.classList.add("selected");
+      tr.innerHTML = `<td>${dp.distance}</td><td>${dp.mode}</td><td>${dp.activationDuration.toFixed(2)}</td>`;
+      tbody.appendChild(tr);
+    });
+    pointsCounter.textContent = `Points total : ${myDataPoints.length + selDataPoints.length}`;
+  }
+
+  function createErsChart(ctx) {
+    return new Chart(ctx, {
+      type: 'line',
+      data: { datasets: [
+        { label:"Moi", data:[], borderColor:"#00ff00", fill:false, pointRadius:0, borderWidth:1, stepped:true },
+        { label:"Adversaire", data:[], borderColor:"#ff0000", fill:false, pointRadius:0, borderWidth:1, stepped:true }
+      ]},
+      options: {
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: true, labels: { font: { size: 12 } } } },
+        scales: {
+          x: { type: 'linear', min: 0, max: trackLength, title: { display: true, text: 'Distance (m)' } },
+          y: { type: 'category', labels: ersModes, title: { display: true, text: 'Mode ERS' }, reverse: true }
+        }
+      }
+    });
+  }
+
+  const ersChart = createErsChart(document.getElementById('ersChart').getContext('2d'));
+
+  // --- Gestion des joueurs ---
+  socket.on("packet_4", packet4 => {
+    playersDiv.innerHTML = "";
+    const participants = packet4.participants || [];
+    myPlayerIndex = packet4.header.player_car_index;
+
+    participants.forEach((p, idx) => {
+      const div = document.createElement("div");
+      div.className = "player";
+      div.textContent = p.name || "Inconnu";
+      div.dataset.index = idx;
+      div.addEventListener("click", () => {
+        selectedPlayerIndex = idx;
+        document.querySelectorAll("#players .player").forEach(el => el.classList.remove("selected"));
+        div.classList.add("selected");
+
+        selDataPoints = [];
+        lastErsModeSel = null;
+        activationStartTimeSel = null;
+        clearInterval(activationIntervalSel);
+
+        // Reset annonces pour le nouveau pilote sélectionné
+        announceZones.forEach(z => z.announced = false);
+        refreshTable();
+      });
+      playersDiv.appendChild(div);
+    });
+  });
+
+  socket.on("packet_1", packet1 => {
+    if(packet1.track_length){
+      trackLength = packet1.track_length;
+      ersChart.options.scales.x.max = trackLength;
+      ersChart.update();
+    }
+  });
+
+  socket.on("packet_2", packet2 => {
+    const lapDataMy = packet2.lap_data[myPlayerIndex];
+    if(lapDataMy){
+      const currentLap = lapDataMy.current_lap_num || 0;
+      latestDistance = lapDataMy.lap_distance || 0;
+
+      if(currentLap !== lastLapNum){
+        lastLapNum = currentLap;
+        // Réinitialiser toutes les annonces pour le nouveau tour
+        announceZones.forEach(z => z.announced = false);
+      }
+    }
+
+    if(selectedPlayerIndex !== null){
+      const lapDataSel = packet2.lap_data[selectedPlayerIndex];
+      if(lapDataSel) selLatestDistance = lapDataSel.lap_distance || 0;
+    }
+  });
+
+  socket.on("packet_7", packet7 => {
+    const statusMy = packet7.car_status_data[myPlayerIndex];
+    if(statusMy){
+      const mode = ersModes[statusMy.ers_deploy_mode] || 'Non';
+      const now = performance.now();
+
+      if(mode !== lastErsMode){
+        if(activationStartTime != null && myDataPoints.length > 0) myDataPoints[myDataPoints.length-1].activationDuration = (now-activationStartTime)/1000;
+        activationStartTime = now;
+        lastErsMode = mode;
+        myDataPoints.push({distance: latestDistance, mode, activationDuration:0});
+        clearInterval(activationInterval);
+        activationInterval = setInterval(()=>{ 
+          if(myDataPoints.length>0) myDataPoints[myDataPoints.length-1].activationDuration=(performance.now()-activationStartTime)/1000; 
+          refreshTable(); 
+        },100);
+      }
+
+      ersChart.data.datasets[0].data.push({x: latestDistance, y: mode});
+
+      // --- Coach vocal : vérifie toutes les zones ---
+      announceZones.forEach(zone => {
+        if(!zone.announced && latestDistance >= zone.distance){
+          zone.announced = true;
+          speak(zone.message);
+        }
+      });
+    }
+
+    if(selectedPlayerIndex !== null){
+      const statusSel = packet7.car_status_data[selectedPlayerIndex];
+      if(statusSel){
+        const modeSel = ersModes[statusSel.ers_deploy_mode] || 'Non';
+        const nowSel = performance.now();
+        if(modeSel !== lastErsModeSel){
+          if(activationStartTimeSel != null && selDataPoints.length>0) selDataPoints[selDataPoints.length-1].activationDuration=(nowSel-activationStartTimeSel)/1000;
+          activationStartTimeSel = nowSel;
+          lastErsModeSel = modeSel;
+          selDataPoints.push({distance: selLatestDistance, mode: modeSel, activationDuration:0});
+          clearInterval(activationIntervalSel);
+          activationIntervalSel = setInterval(()=>{ 
+            if(selDataPoints.length>0) selDataPoints[selDataPoints.length-1].activationDuration=(performance.now()-activationStartTimeSel)/1000; 
+            refreshTable(); 
+          },100);
+        }
+        ersChart.data.datasets[1].data.push({x: selLatestDistance, y: modeSel});
+      }
+    }
+
+    ersChart.update();
+    refreshTable();
+  });
+
+  // --- Bouton test vocal ---
+  document.getElementById("testVoice").addEventListener("click", () => {
+    speak("test");
+  });
+
+});
+</script>
+
+</body>
+</html>

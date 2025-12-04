@@ -1,7 +1,7 @@
 from scapy.all import UDP, IP, Raw, send, rdpcap
 import time
 
-PCAP_FILE = "autriche1tour.pcap"
+PCAP_FILE = "./replay_udp/autriche1tour.pcap"
 DST_IP = "127.0.0.1"
 DST_PORT = 20777
 IFACE = "lo0"  # Interface loopback sur macOS

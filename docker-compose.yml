@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  # Nom du service (vous pouvez le changer)
+  f1-telemetry-listener:
+    # Construit l'image à partir du Dockerfile dans le répertoire actuel
+    build: .
+    # Nom du conteneur une fois lancé
+    container_name: f1-telemetry-app
+    # Gestion des ports :
+    ports:
+      # 1. Mappage du port HTTP pour l'interface web (http://localhost:5000)
+      - "5000:5000"
+      # 2. Mappage du port UDP pour la télémétrie F1 23. C'est CRUCIAL.
+      # L'option /udp est nécessaire pour indiquer que le protocole est UDP
+      - "20777:20777/udp"
+    # Optionnel : Redémarre le conteneur en cas d'arrêt ou de crash
+    restart: unless-stopped

@@ -3,14 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>Analyse Multi-paramètres Comparatif</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: 'Roboto', sans-serif; background:#121212; color:#fff; padding:20px; }
     h1 { color:#ff3b3f; margin-bottom:20px; text-align:center; }
 
-    /* Bandeau joueurs */
     #players {
       width: 95%;
       max-width: 1000px;
@@ -35,13 +33,12 @@
       border:2px solid #ffa500;
       color:#ffa500;
     }
-    #players .ghost {
-      color:#888;
-      font-style: italic;
-    }
+    #players .ghost { color:#888; font-style: italic; }
 
     .chart-container { width:95%; max-width:1000px; margin:auto; margin-bottom:30px; }
     canvas { background-color: #ffffff !important; border-radius: 6px; box-shadow: 0 0 10px rgba(0,0,0,0.4); }
+
+    #points-counter { text-align:center; margin-bottom:10px; font-size:1em; color:#ffa500; }
 
     table { border-collapse: collapse; width:90%; max-width:1000px; margin:auto; background:#1e1e1e; border-radius:10px; overflow:hidden; margin-bottom:50px; }
     th, td { border:1px solid #333; padding:8px 12px; text-align:center; }
@@ -61,6 +58,9 @@
 <div class="chart-container"><canvas id="rpmChart" height="150"></canvas></div>
 <div class="chart-container"><canvas id="throttleChart" height="100"></canvas></div>
 <div class="chart-container"><canvas id="brakeChart" height="100"></canvas></div>
+<div class="chart-container"><canvas id="ersChart" height="100"></canvas></div>
+
+<div id="points-counter">Points total : 0</div>
 
 <table id="analyse-table">
   <thead>
@@ -71,6 +71,7 @@
       <th>RPM</th>
       <th>Throttle (%)</th>
       <th>Brake (%)</th>
+      <th>ERS MODE</th>
     </tr>
   </thead>
   <tbody></tbody>
@@ -78,32 +79,88 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  const tbody = document.querySelector("#analyse-table tbody");
-  const socket = io("http://192.168.1.15:5000");
-
+  const socket = io("http://192.168.1.14:5000");
   const playersDiv = document.getElementById("players");
-  let selectedPlayerIndex = null;  
-  let myPlayerIndex = null;        
+  const tbody = document.querySelector("#analyse-table tbody");
+  const pointsCounter = document.getElementById("points-counter");
 
-  const lapColors = ["#d40000", "#00d400", "#0040ff", "#ffa500", "#ff00ff", "#00ffff", "#ff69b4", "#a52a2a"];
-  const currentDatasets = {};
-  let latestDistance = 0;
-  let trackLength = 7004;
+  let selectedPlayerIndex = null;
+  let myPlayerIndex = null;
   let currentLap = 0;
+  let trackLength = 7004;
+  let latestDistance = 0;
+  let selLatestDistance = 0;
+
+  const currentDatasets = {};
+
+  // --- Stockage des points pour le tableau ---
+  let myDataPoints = [];
+  let selDataPoints = [];
 
   function createChart(ctx, label, minY, maxY) {
+    const turnMarkers = [
+      { x: 447, label: 'T1', yPosition: 'bottom' },
+      { x: 1065, label: 'T2', yPosition: 'bottom' },
+      { x: 1382, label: 'T3', yPosition: 'bottom' },
+      { x: 2185, label: 'T4', yPosition: 'bottom' },
+      { x: 2398, label: 'T5', yPosition: 'bottom' },
+      { x: 2664, label: 'T6', yPosition: 'bottom' },
+      { x: 3077, label: 'T7', yPosition: 'bottom' },
+      { x: 3182, label: 'T8', yPosition: 'bottom' },
+      { x: 3755, label: 'T9', yPosition: 'bottom' },
+      { x: 4003, label: 'T10', yPosition: 'bottom' },
+      { x: 562, label: 'DRS1', yPosition: 'top' },
+      { x: 1520, label: 'DRS2', yPosition: 'top' },
+      { x: 4139, label: 'DRS3', yPosition: 'top' }
+    ];
+
     return new Chart(ctx, {
       type: 'line',
       data: { datasets: [] },
       options: {
-        responsive:true,
-        interaction:{ mode:'index', intersect:false },
-        plugins:{ legend:{ display:true, labels:{ font:{ size:12 } } } },
-        scales:{
-          x:{ type:'linear', min:0, max:trackLength, title:{ display:true, text:'Distance (m)' } },
-          y:{ type:'linear', min:minY, max:maxY, title:{ display:true, text:label } }
+        responsive: true,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: true, labels: { font: { size: 12 } } } },
+        scales: {
+          x: {
+            type: 'linear',
+            min: 0,
+            max: trackLength,
+            ticks: {
+              callback: function(value) {
+                const markers = [447, 1065, 1382, 2185, 2398, 2664, 3077, 3182, 3755, 4003, 562, 1520, 4139];
+                return markers.includes(value) ? value : '';
+              }
+            },
+            grid: { drawTicks: true, drawOnChartArea: false }
+          },
+          y: { type: 'linear', min: minY, max: maxY, title: { display: true, text: label } }
         }
-      }
+      },
+      plugins: [{
+        id: 'verticalLines',
+        afterDraw: chart => {
+          const ctx = chart.ctx;
+          const xAxis = chart.scales.x;
+          const yAxis = chart.scales.y;
+
+          turnMarkers.forEach(marker => {
+            const xPos = xAxis.getPixelForValue(marker.x);
+            ctx.save();
+            ctx.strokeStyle = 'rgba(240, 240, 240, 0.6)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(xPos, yAxis.top);
+            ctx.lineTo(xPos, yAxis.bottom);
+            ctx.stroke();
+            ctx.fillStyle = '#ffa500';
+            ctx.font = '10px Arial';
+            const yText = marker.yPosition === 'top' ? yAxis.top + 10 : yAxis.bottom - 2;
+            ctx.fillText(marker.label, xPos + 2, yText);
+            ctx.restore();
+          });
+        }
+      }]
     });
   }
 
@@ -113,29 +170,52 @@ document.addEventListener("DOMContentLoaded", () => {
   const throttleChart = createChart(document.getElementById('throttleChart').getContext('2d'), 'Throttle (%)', 0, 100);
   const brakeChart = createChart(document.getElementById('brakeChart').getContext('2d'), 'Brake (%)', 0, 100);
 
+  const ersModes = ['Non', 'Intermédiaire', 'Chrono', 'Dépassement'];
+  const ersChart = new Chart(document.getElementById('ersChart').getContext('2d'), {
+    type: 'line',
+    data: { datasets: [] },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      animations: false,
+      plugins: { legend: { display: true, labels: { font: { size: 12 } } } },
+      scales: {
+        x: { type: 'linear', min: 0, max: trackLength, title: { display: true, text: 'Distance (m)' } },
+        y: { type: 'category', labels: ersModes, title: { display: true, text: 'Mode ERS' }, reverse: true }
+      }
+    }
+  });
+
   function addLapDataset(chart, lapNum, label, color) {
-    const dataset = { label: `${label} - Lap ${lapNum}`, data: [], borderColor: color, fill:false, tension:0, borderWidth:1, pointRadius:0 };
+    const dataset = { label: `${label} - Lap ${lapNum}`, data: [], borderColor: color, fill: false, tension: 0, borderWidth: 1, pointRadius: 0, stepped: true };
     chart.data.datasets.push(dataset);
     chart.update();
     return dataset;
   }
 
-  function refreshTable(myData, selData) {
+  // --- Nouvelle version : affiche tous les points + compteur ---
+  function refreshTable() {
     tbody.innerHTML = "";
-    if(myData) {
+
+    myDataPoints.forEach(data => {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${myData.distance}</td><td>${myData.speed}</td><td>${myData.gear}</td><td>${myData.rpm}</td><td>${myData.throttle}</td><td>${myData.brake}</td>`;
+      tr.innerHTML = `<td>${data.distance}</td><td>${data.speed}</td><td>${data.gear}</td><td>${data.rpm}</td><td>${data.throttle}</td><td>${data.brake}</td>`;
       tbody.appendChild(tr);
-    }
-    if(selData) {
+    });
+
+    selDataPoints.forEach(data => {
       const tr = document.createElement("tr");
       tr.classList.add("selected");
-      tr.innerHTML = `<td>${selData.distance}</td><td>${selData.speed}</td><td>${selData.gear}</td><td>${selData.rpm}</td><td>${selData.throttle}</td><td>${selData.brake}</td>`;
+      tr.innerHTML = `<td>${data.distance}</td><td>${data.speed}</td><td>${data.gear}</td><td>${data.rpm}</td><td>${data.throttle}</td><td>${data.brake}</td>`;
       tbody.appendChild(tr);
-    }
+    });
+
+    // --- Mise à jour du compteur ---
+    const totalPoints = myDataPoints.length + selDataPoints.length;
+    pointsCounter.textContent = `Points total : ${totalPoints}`;
   }
 
-  // ----- Liste des joueurs -----
+  // --- Gestion des joueurs ---
   socket.on("packet_4", packet4 => {
     playersDiv.innerHTML = "";
     const participants = packet4.participants || [];
@@ -143,55 +223,60 @@ document.addEventListener("DOMContentLoaded", () => {
 
     participants.forEach((p, idx) => {
       const name = p.name || "Inconnu";
-      const isGhost = name.toLowerCase().includes("record");
       const div = document.createElement("div");
-      div.className = "player" + (isGhost ? " ghost" : "");
-      div.textContent = name;  // Seulement le nom, pas l’écurie ni le numéro
+      div.className = "player";
+      div.textContent = name;
       div.dataset.index = idx;
       div.addEventListener("click", () => {
         selectedPlayerIndex = idx;
         document.querySelectorAll("#players .player").forEach(el => el.classList.remove("selected"));
         div.classList.add("selected");
-        [speedChart, gearChart, rpmChart, throttleChart, brakeChart].forEach(chart => {
+
+        [speedChart, gearChart, rpmChart, throttleChart, brakeChart, ersChart].forEach(chart => {
           chart.data.datasets = [];
           currentDatasets[chart.canvas.id] = {};
         });
+
         currentLap = 0;
+        myDataPoints = [];
+        selDataPoints = [];
+        refreshTable();
       });
       playersDiv.appendChild(div);
     });
   });
 
+  // --- Track length ---
   socket.on("packet_1", packet1 => {
-    if(packet1.track_length) {
+    if (packet1.track_length) {
       trackLength = packet1.track_length;
-      [speedChart, gearChart, rpmChart, throttleChart, brakeChart].forEach(chart => {
+      [speedChart, gearChart, rpmChart, throttleChart, brakeChart, ersChart].forEach(chart => {
         chart.options.scales.x.max = trackLength;
         chart.update();
       });
     }
   });
 
+  // --- Gestion des tours ---
   socket.on("packet_2", packet2 => {
     const myLapData = packet2.lap_data[myPlayerIndex];
     const selLapData = selectedPlayerIndex !== null ? packet2.lap_data[selectedPlayerIndex] : null;
-
     const lapNum = myLapData?.current_lap_num || 0;
-    if(lapNum !== currentLap){
+
+    if (lapNum !== currentLap) {
       currentLap = lapNum;
-      [speedChart, gearChart, rpmChart, throttleChart, brakeChart].forEach(chart => {
-        const myDataset = addLapDataset(chart, lapNum, chart.options.scales.y.title.text, "#ff3b3f");
-        currentDatasets[chart.canvas.id] = { my: myDataset, sel: null };
-        if(selLapData) {
-          const selDataset = addLapDataset(chart, lapNum, chart.options.scales.y.title.text, "#ffa500");
-          currentDatasets[chart.canvas.id].sel = selDataset;
-        }
+      [speedChart, gearChart, rpmChart, throttleChart, brakeChart, ersChart].forEach(chart => {
+        const myDataset = addLapDataset(chart, lapNum, "Moi", "#000000");
+        const selDataset = selLapData ? addLapDataset(chart, lapNum, "Adversaire", "#ff0000") : null;
+        currentDatasets[chart.canvas.id] = { my: myDataset, sel: selDataset };
       });
     }
 
     latestDistance = myLapData?.lap_distance || 0;
+    selLatestDistance = selLapData?.lap_distance || 0;
   });
 
+  // --- Données télémétriques classiques ---
   socket.on("packet_6", packet6 => {
     const myTelemetry = packet6.car_telemetry_data[myPlayerIndex] || {};
     const selTelemetry = selectedPlayerIndex !== null ? packet6.car_telemetry_data[selectedPlayerIndex] || {} : null;
@@ -204,31 +289,48 @@ document.addEventListener("DOMContentLoaded", () => {
       throttle: (myTelemetry.throttle || 0) * 100,
       brake: (myTelemetry.brake || 0) * 100
     };
+    myDataPoints.push(myDataPoint);
 
     const selDataPoint = selTelemetry ? {
-      distance: latestDistance,
+      distance: selLatestDistance,
       speed: selTelemetry.speed || 0,
       gear: selTelemetry.gear || 0,
       rpm: selTelemetry.engine_rpm || 0,
       throttle: (selTelemetry.throttle || 0) * 100,
       brake: (selTelemetry.brake || 0) * 100
     } : null;
+    if(selDataPoint) selDataPoints.push(selDataPoint);
 
-    ["speedChart","gearChart","rpmChart","throttleChart","brakeChart"].forEach(id => {
-      if(currentDatasets[id]) {
+    ["speedChart", "gearChart", "rpmChart", "throttleChart", "brakeChart"].forEach(id => {
+      if (currentDatasets[id]) {
         const ds = currentDatasets[id];
-        const key = id.replace("Chart","");
-        if(ds.my) ds.my.data.push({x:myDataPoint.distance, y:myDataPoint[key.toLowerCase()] || 0});
-        if(ds.sel && selDataPoint) ds.sel.data.push({x:selDataPoint.distance, y:selDataPoint[key.toLowerCase()] || 0});
+        const key = id.replace("Chart", "").toLowerCase();
+        if (ds.my) ds.my.data.push({ x: myDataPoint.distance, y: myDataPoint[key] || 0 });
+        if (ds.sel && selDataPoint) ds.sel.data.push({ x: selDataPoint.distance, y: selDataPoint[key] || 0 });
       }
     });
 
     [speedChart, gearChart, rpmChart, throttleChart, brakeChart].forEach(chart => chart.update());
-    refreshTable(myDataPoint, selDataPoint);
+    refreshTable();
   });
 
+  // --- Données ERS ---
+  socket.on("packet_7", packet7 => {
+    const myStatus = packet7.car_status_data[myPlayerIndex];
+    const selStatus = selectedPlayerIndex !== null ? packet7.car_status_data[selectedPlayerIndex] : null;
+    if (!myStatus) return;
+
+    const myMode = myStatus.ers_deploy_mode ?? 0;
+    const selMode = selStatus?.ers_deploy_mode ?? null;
+
+    if (currentDatasets["ersChart"]) {
+      const ds = currentDatasets["ersChart"];
+      if (ds.my) ds.my.data.push({ x: latestDistance, y: ersModes[myMode] || 'Non' });
+      if (ds.sel && selMode !== null) ds.sel.data.push({ x: latestDistance, y: ersModes[selMode] || 'Non' });
+    }
+    ersChart.update();
+  });
 });
 </script>
-
 </body>
 </html>
