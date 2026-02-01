@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>F1 Telemetry Pro: Lap Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- STYLE GLOBAL --- */
+        :root { 
+            --bg: #0b0c10; --panel: #1f2833; --text: #c5c6c7; 
+            --color-ref: #00AEEF; /* Bleu */
+            --color-comp: #E10600; /* Rouge */
+        }
+
+        body { 
+            background-color: var(--bg); color: var(--text); 
+            font-family: 'Roboto', sans-serif; margin: 0; padding: 10px; 
+            height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; 
+            overflow: hidden;
+        }
+
+        /* HEADER */
+        .header { display: flex; justify-content: space-between; align-items: center; height: 30px; margin-bottom: 10px; flex-shrink: 0; }
+        h1 { margin: 0; font-size: 1.1em; display: flex; align-items: center; gap: 10px; }
+        .live-dot { width: 8px; height: 8px; background: var(--color-comp); border-radius: 50%; }
+        .back-btn { color: #888; text-decoration: none; font-size: 0.8em; border: 1px solid #333; padding: 4px 8px; border-radius: 4px; } 
+        .back-btn:hover { color: #fff; border-color: #fff; }
+
+        /* LAYOUT */
+        .layout { 
+            display: grid; 
+            grid-template-columns: 280px 1fr; 
+            gap: 15px; 
+            height: calc(100vh - 60px); 
+            min-height: 400px;
+        }
+
+        /* SIDEBAR */
+        .sidebar { 
+            background: var(--panel); border: 1px solid #333; border-radius: 6px; 
+            display: flex; flex-direction: column; 
+            padding: 10px; 
+            overflow: hidden;
+        }
+        .section-title { font-weight: bold; font-size: 0.8em; margin-bottom: 5px; color: #888; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 5px; flex-shrink: 0; }
+        
+        #sessionList { 
+            overflow-y: auto; flex: 1; margin-bottom: 10px; border-bottom: 1px solid #333; min-height: 50px;
+        }
+
+        .controls-area { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
+
+        .session-item { padding: 8px; border-bottom: 1px solid #333; cursor: pointer; font-size: 0.8em; transition: 0.2s; }
+        .session-item:hover { background: #2a2a2a; } 
+        .session-item.active { background: #222; border-left: 3px solid var(--color-ref); }
+        .track-name { font-weight: bold; color: #fff; }
+        .session-meta { font-size: 0.85em; color: #888; }
+
+        /* INPUTS */
+        .lap-selector-box { background: #111; padding: 6px; border-radius: 4px; border: 1px solid #333; }
+        .lap-label { display: block; font-size: 0.7em; font-weight: bold; margin-bottom: 2px; }
+        select { width: 100%; background: #222; color: #fff; border: 1px solid #444; padding: 4px; font-family: 'Roboto Mono'; font-size: 0.85em; }
+        
+        button.btn-load { width: 100%; padding: 10px; background: #fff; color: #000; font-weight: bold; border: none; cursor: pointer; border-radius: 4px; transition: 0.2s; font-size: 0.9em; }
+        button.btn-load:hover { background: #ccc; }
+
+        /* GRAPHIQUES */
+        .charts-container { 
+            display: flex; flex-direction: column; 
+            background: #000; border: 1px solid #333; border-radius: 4px; 
+            padding: 5px 20px 0 10px; 
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .legend-overlay {
+            position: absolute; top: 10px; right: 20px; 
+            background: rgba(0,0,0,0.8); padding: 5px 10px; border-radius: 4px; border: 1px solid #444;
+            display: flex; gap: 15px; font-size: 0.8em; font-weight: bold; pointer-events: none; z-index: 10;
+        }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+        .chart-row { width: 100%; position: relative; border-bottom: 1px solid #222; }
+        .chart-row:last-child { border-bottom: none; }
+        
+        #c-speed { height: 40%; }    
+        #c-throttle { height: 20%; } 
+        #c-brake { height: 20%; }   
+        #c-gear { height: 20%; }     
+
+        canvas { display: block; width: 100%; height: 100%; }
+        .empty-msg { color: #555; text-align: center; padding: 20px; font-style: italic; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><div class="live-dot"></div> TELEMETRY ANALYSIS</h1>
+        <a href="/dashboard" class="back-btn">← Retour Dashboard</a>
+    </div>
+
+    <div class="layout">
+        <div class="sidebar">
+            <div class="section-title">1. Sessions</div>
+            <div id="sessionList"><div class="empty-msg">Chargement...</div></div>
+
+            <div class="controls-area">
+                <div class="lap-selector-box" style="border-left: 3px solid var(--color-ref);">
+                    <span class="lap-label" style="color:var(--color-ref)">TOUR PRINCIPAL (BLEU)</span>
+                    <select id="lapA"><option>Sélectionnez une session</option></select>
+                </div>
+
+                <div class="lap-selector-box" style="border-left: 3px solid var(--color-comp);">
+                    <span class="lap-label" style="color:var(--color-comp)">TOUR COMPARAISON (ROUGE)</span>
+                    <select id="lapB"><option>Sélectionnez une session</option></select>
+                </div>
+
+                <button class="btn-load" onclick="loadComparison()">CHARGER DONNÉES</button>
+            </div>
+        </div>
+
+        <div class="charts-container">
+            <div class="legend-overlay">
+                <div class="legend-item"><div class="dot" style="background:var(--color-ref)"></div> Ref</div>
+                <div class="legend-item" id="legendItemB"><div class="dot" style="background:var(--color-comp)"></div> Comp</div>
+            </div>
+
+            <div class="chart-row" id="c-speed"><canvas id="chartSpeed"></canvas></div>
+            <div class="chart-row" id="c-throttle"><canvas id="chartThrottle"></canvas></div>
+            <div class="chart-row" id="c-brake"><canvas id="chartBrake"></canvas></div>
+            <div class="chart-row" id="c-gear"><canvas id="chartGear"></canvas></div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION CHART.JS ---
+        Chart.defaults.color = '#666';
+        Chart.defaults.borderColor = '#222';
+        Chart.defaults.font.family = "'Roboto Mono', monospace";
+        
+        const commonOptions = {
+            responsive: true, maintainAspectRatio: false,
+            layout: { padding: { left: 0, right: 10, top: 5, bottom: 5 } },
+            animation: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                x: { type: 'linear', display: false, grid: { display: false } },
+                y: { position: 'left', grid: { color: '#222' }, beginAtZero: true }
+            },
+            plugins: { legend: { display: false }, tooltip: { enabled: true, mode: 'nearest', intersect: false } },
+            onHover: (e, activeElements, chart) => syncCharts(e, chart)
+        };
+
+        const charts = {};
+
+        function syncCharts(e, sourceChart) {
+            // Synchro visuelle future
+        }
+
+        // --- LOGIQUE ---
+        let currentUid = null;
+
+        async function init() {
+            try {
+                const response = await fetch('/api/sessions');
+                const sessions = await response.json();
+                const list = document.getElementById('sessionList'); list.innerHTML = '';
+                
+                if(sessions.length === 0) {
+                    list.innerHTML = '<div class="empty-msg">Aucune session.<br><small>Replay ou Tour incomplet ?</small></div>';
+                    return;
+                }
+
+                sessions.forEach(s => {
+                    const div = document.createElement('div'); div.className = 'session-item';
+                    const lapsText = s.laps ? `${s.laps} Tours` : "Tours inconnus";
+                    div.innerHTML = `<span class="track-name">${s.track}</span><br><span class="session-meta">${s.mode} | ${lapsText} | ${s.date}</span>`;
+                    div.onclick = () => {
+                        document.querySelectorAll('.session-item').forEach(i=>i.classList.remove('active'));
+                        div.classList.add('active');
+                        currentUid = s.uid;
+                        loadLaps(s.uid);
+                    };
+                    list.appendChild(div);
+                });
+            } catch (e) {
+                document.getElementById('sessionList').innerHTML = '<div class="empty-msg" style="color:#E10600">Erreur API</div>';
+            }
+        }
+
+        async function loadLaps(uid) {
+            const selA = document.getElementById('lapA');
+            const selB = document.getElementById('lapB');
+            selA.innerHTML = '<option>...</option>'; selB.innerHTML = '<option>...</option>';
+            
+            try {
+                const laps = await fetch(`/api/laps/${uid}`).then(r=>r.json());
+                selA.innerHTML = ''; selB.innerHTML = '';
+                
+                if(laps.length === 0) {
+                    selA.innerHTML = '<option>Aucun tour</option>'; selB.innerHTML = '<option>Aucun tour</option>';
+                    return;
+                }
+
+                // Ajout des tours au menu A
+                laps.forEach(l => selA.add(new Option(`Tour ${l}`, l)));
+
+                // Ajout des tours au menu B avec l'option "AUCUN"
+                selB.add(new Option("⛔ Aucun (Mode Solo)", "")); // Option Vide
+                laps.forEach(l => selB.add(new Option(`Tour ${l}`, l)));
+                
+                // Auto-sélection
+                if(laps.length > 0) selA.value = laps[laps.length-1]; // Dernier
+                if(laps.length > 1) selB.value = laps[laps.length-2]; // Avant-dernier
+                else selB.value = ""; // Si un seul tour, on met B à vide
+                
+            } catch (error) { console.error(error); }
+        }
+
+        function createDataset(label, xData, yData, color, isStepped=false) {
+            const points = xData.map((dist, i) => ({ x: dist, y: yData[i] }));
+            return {
+                label: label,
+                data: points,
+                borderColor: color,
+                borderWidth: 1.5,
+                pointRadius: 0,
+                showLine: true,
+                stepped: isStepped
+            };
+        }
+
+        async function loadComparison() {
+            if(!currentUid) return alert("Sélectionnez une session.");
+            const lapA = document.getElementById('lapA').value;
+            const lapB = document.getElementById('lapB').value; // Peut être vide
+
+            if(!lapA) return alert("Sélectionnez au moins un tour principal.");
+
+            try {
+                // On charge A tout le temps
+                const pA = fetch(`/api/full_telemetry/${currentUid}/${lapA}`).then(r=>r.json());
+                // On charge B seulement si une valeur est sélectionnée
+                const pB = lapB ? fetch(`/api/full_telemetry/${currentUid}/${lapB}`).then(r=>r.json()) : Promise.resolve({});
+
+                const [dataA, dataB] = await Promise.all([pA, pB]);
+
+                if(!dataA.dist || dataA.dist.length === 0) return alert("Tour A vide !");
+                
+                // Vérifie si on a des données pour B
+                const hasB = lapB && dataB.dist && dataB.dist.length > 0;
+
+                // Mise à jour légende
+                document.getElementById('legendItemB').style.display = hasB ? 'flex' : 'none';
+
+                Object.values(charts).forEach(c => c && c.destroy());
+
+                // Fonction helper pour générer les datasets dynamiquement
+                const getDatasets = (field, colorA, colorB, stepped=false) => {
+                    const sets = [createDataset('Ref', dataA.dist, dataA[field], colorA, stepped)];
+                    if(hasB) sets.push(createDataset('Comp', dataB.dist, dataB[field], colorB, stepped));
+                    return sets;
+                };
+
+                // 1. SPEED
+                charts.speed = new Chart(document.getElementById('chartSpeed'), {
+                    type: 'scatter',
+                    data: { datasets: getDatasets('speed', '#00AEEF', '#E10600') },
+                    options: { ...commonOptions, scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, title: {display:true, text:'Vitesse'} } } }
+                });
+
+                // 2. THROTTLE
+                charts.throttle = new Chart(document.getElementById('chartThrottle'), {
+                    type: 'scatter',
+                    data: { datasets: getDatasets('throttle', '#00AEEF', '#E10600') },
+                    options: { ...commonOptions, scales: { ...commonOptions.scales, y: { min:0, max:100, title:{display:true, text:'Accel'} } } }
+                });
+
+                // 3. BRAKE
+                charts.brake = new Chart(document.getElementById('chartBrake'), {
+                    type: 'scatter',
+                    data: { datasets: getDatasets('brake', '#00AEEF', '#E10600') },
+                    options: { ...commonOptions, scales: { ...commonOptions.scales, y: { min:0, max:100, title:{display:true, text:'Frein'} } } }
+                });
+
+                // 4. GEAR
+                charts.gear = new Chart(document.getElementById('chartGear'), {
+                    type: 'scatter',
+                    data: { datasets: getDatasets('gear', '#00AEEF', '#E10600', true) },
+                    options: { ...commonOptions, scales: { ...commonOptions.scales, y: { min:0, max:8, ticks:{stepSize:1}, title:{display:true, text:'Rapport'} }, x: { type: 'linear', display: true, title: {display:true, text:'Distance (m)'}, grid:{color:'#333'} } } }
+                });
+
+            } catch (e) {
+                console.error(e);
+                alert("Erreur chargement.");
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

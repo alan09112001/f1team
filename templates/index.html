@@ -1,74 +1,70 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <title>Packets F1 23</title>
-  <style>
-    body { font-family: sans-serif; background:#121212; color:#fff; padding:20px; }
-    h1 { color:#ff3b3f; margin-bottom:20px; }
-    select { margin-bottom:20px; padding:6px 10px; border-radius:6px; background:#1e1e1e; color:#fff; border:1px solid #333; }
-    ul { padding:0; list-style:none; transition: all 0.3s; }
-    ul.brut li { margin:4px 0; }
-    ul.ameliore { display:flex; flex-wrap:wrap; gap:15px; }
-    ul.ameliore li { background:#1e1e1e; padding:12px 18px; border-radius:10px; min-width:180px; text-align:center; }
-    a { color:#ff6b6b; font-weight:700; text-decoration:none; }
-    a:hover { text-decoration:underline; }
-    .packet-name { display:block; margin-top:6px; color:#bbb; font-size:0.95em; }
-  </style>
+    <meta charset="UTF-8">
+    <title>F1 Telemetry Monitor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body { font-family: monospace; background: #1e1e1e; color: #00ff00; padding: 20px; }
+        .status { margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .packet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+        .packet-card { background: #333; padding: 10px; border-radius: 5px; }
+        .packet-id { font-weight: bold; color: #fff; }
+        .packet-val { font-size: 0.9em; color: #aaa; word-break: break-all; }
+        .highlight { color: #ffff00; }
+    </style>
 </head>
 <body>
-  <h1>Packets UDP F1 23</h1>
+    <div class="status">
+        <h1>Moniteur Télémétrie F1 23</h1>
+        <p>Statut SocketIO: <span id="connection-status" style="color: red;">Déconnecté</span></p>
+    </div>
 
-  <label for="viewMode">Mode d'affichage :</label>
-  <select id="viewMode">
-    <option value="brut" selected>Brut</option>
-    <option value="ameliore">Amélioré</option>
-  </select>
+    <div id="packet-container" class="packet-grid">
+        </div>
 
-  <ul id="packetList" class="brut">
-    {% set names = {
-      0:"Motion",
-      1:"Session",
-      2:"Lap Data",
-      3:"Event",
-      4:"Participants",
-      5:"Car Setups",
-      6:"Car Telemetry",
-      7:"Car Status",
-      8:"Final Classification",
-      9:"Lobby Info",
-      10:"Car Damage",
-      11:"Session History",
-      12:"Tyre Sets"
-    } %}
-    {% for i in range(13) %}
-      <li>
-        <a href="/packet/{{ i }}">Packet {{ i }}</a>
-        <span class="packet-name">{{ names.get(i, "Inconnu") }}</span>
-      </li>
-    {% endfor %}
-    <li>
-  <a href="/analyse">Analyse</a>
-  <span class="packet-name">Analyse</span>
-  <a href="/analyseers">Analyse ERS </a>
-  <span class="packet-name">Analyseers</span>
-</li>
+    <script>
+        const socket = io();
 
-  </ul>
+        socket.on('connect', () => {
+            document.getElementById('connection-status').innerText = "Connecté";
+            document.getElementById('connection-status').style.color = "green";
+        });
 
-  <script>
-    const select = document.getElementById('viewMode');
-    const list = document.getElementById('packetList');
+        socket.on('disconnect', () => {
+            document.getElementById('connection-status').innerText = "Déconnecté";
+            document.getElementById('connection-status').style.color = "red";
+        });
 
-    select.addEventListener('change', () => {
-      if(select.value === 'brut') {
-        list.classList.remove('ameliore');
-        list.classList.add('brut');
-      } else {
-        list.classList.remove('brut');
-        list.classList.add('ameliore');
-      }
-    });
-  </script>
+        // On écoute tous les paquets possibles (0 à 12 pour F1 23)
+        for (let i = 0; i <= 12; i++) {
+            socket.on(`packet_${i}`, (data) => {
+                updatePacketDisplay(i, data);
+            });
+        }
+
+        function updatePacketDisplay(id, data) {
+            let card = document.getElementById(`pkt-${id}`);
+            
+            // Si la carte n'existe pas, on la crée
+            if (!card) {
+                const container = document.getElementById('packet-container');
+                card = document.createElement('div');
+                card.id = `pkt-${id}`;
+                card.className = 'packet-card';
+                card.innerHTML = `<div class="packet-id">Packet ID: ${id}</div><div class="packet-val" id="val-${id}">Wait...</div>`;
+                container.appendChild(card);
+            }
+
+            // Mise à jour visuelle simple (affiche la taille des données ou un champ clé)
+            const valDiv = document.getElementById(`val-${id}`);
+            // On affiche juste un JSON stringifié court pour vérifier la réception
+            valDiv.innerText = JSON.stringify(data).substring(0, 50) + "...";
+            
+            // Petit effet visuel pour montrer l'activité
+            card.style.border = "1px solid #ffff00";
+            setTimeout(() => { card.style.border = "none"; }, 100);
+        }
+    </script>
 </body>
 </html>

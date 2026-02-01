@@ -1,18 +1,57 @@
 version: '3.8'
 
 services:
-  # Nom du service (vous pouvez le changer)
-  f1-telemetry-listener:
-    # Construit l'image à partir du Dockerfile dans le répertoire actuel
-    build: .
-    # Nom du conteneur une fois lancé
-    container_name: f1-telemetry-app
-    # Gestion des ports :
+  # 1. Base de données (InfluxDB)
+  influxdb:
+    image: influxdb:2.7
+    container_name: f1_influxdb
     ports:
-      # 1. Mappage du port HTTP pour l'interface web (http://localhost:5000)
-      - "5000:5000"
-      # 2. Mappage du port UDP pour la télémétrie F1 23. C'est CRUCIAL.
-      # L'option /udp est nécessaire pour indiquer que le protocole est UDP
-      - "20777:20777/udp"
-    # Optionnel : Redémarre le conteneur en cas d'arrêt ou de crash
-    restart: unless-stopped
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=f1telemetry  # Mot de passe
+      - DOCKER_INFLUXDB_INIT_ORG=f1team
+      - DOCKER_INFLUXDB_INIT_BUCKET=telemetry
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-auth-token
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+
+  # 2. Dashboard (Grafana)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: f1_grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - influxdb
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      # --- NOUVEAU : Autoriser l'intégration HTML ---
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+  # 3. Ton Application (Listener + Flask)
+  listener:
+    build: .
+    container_name: f1_listener
+    depends_on:
+      - influxdb
+    ports:
+      - "20777:20777/udp" # Port UDP du jeu
+      - "5000:5000"       # Port Web Flask
+    environment:
+      - INFLUXDB_URL=http://influxdb:8086
+      - INFLUXDB_TOKEN=my-super-secret-auth-token
+      - INFLUXDB_ORG=f1team
+      - INFLUXDB_BUCKET=telemetry
+    volumes:
+      - .:/app
+
+volumes:
+  influxdb_data:
+  grafana_data:

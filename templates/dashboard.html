@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>F1 TEAM PITWALL</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    /* --- VARIABLES & RESET --- */
+    :root {
+        --f1-red: #E10600;
+        --f1-blue: #00AEEF;
+        --f1-yellow: #FFD700;
+        --f1-green: #00D2BE;
+        --bg-dark: #121212;
+        --panel-bg: #1E1E1E;
+        --panel-header-bg: #2A2A2A;
+        --border-color: #333;
+        --text-light: #F0F0F0;
+        --text-dim: #888;
+        --font-main: 'Roboto', sans-serif;
+        --font-data: 'Roboto Mono', monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0; padding: 20px;
+        background-color: var(--bg-dark);
+        color: var(--text-light);
+        font-family: var(--font-main);
+        height: 100vh; overflow: hidden;
+        display: flex; justify-content: center; align-items: center;
+    }
+
+    /* --- LAYOUT GRID --- */
+    .cockpit {
+        display: grid;
+        grid-template-columns: 350px 1fr 300px;
+        grid-template-rows: 60px 1fr 140px;
+        gap: 15px;
+        width: 100%; height: 95vh;
+        max-width: 1920px;
+        background: #000; padding: 15px; border: 2px solid #333;
+    }
+
+    /* --- COMMON PANEL STYLE --- */
+    .panel {
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        display: flex; flex-direction: column;
+        overflow: hidden;
+    }
+    .panel-header {
+        background: var(--panel-header-bg); padding: 10px 15px;
+        font-weight: 700; font-size: 0.9em; letter-spacing: 1px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex; justify-content: space-between; align-items: center;
+    }
+
+    /* --- HEADER --- */
+    .header-info {
+        grid-column: 1 / -1;
+        display: flex; align-items: center; justify-content: space-between;
+        background: linear-gradient(90deg, var(--panel-bg) 0%, var(--panel-header-bg) 100%);
+        border-bottom: 4px solid var(--f1-red);
+        padding: 0 20px;
+    }
+    
+    .brand {
+        font-size: 1.6em; font-weight: 900; font-style: italic;
+        letter-spacing: -1px; color: #fff;
+    }
+    .brand span { color: var(--f1-red); }
+
+    .telemetry-strip {
+        display: flex; gap: 30px; font-family: var(--font-data); font-size: 1.1em;
+    }
+    .telemetry-item i { margin-right: 8px; color: var(--f1-red); }
+    .data-val { font-weight: 700; color: #fff; }
+
+    /* --- LEFT: COMMS --- */
+    .comm-panel { grid-row: 2 / 4; }
+    
+    .live-indicator {
+        font-size: 0.8em; color: var(--f1-red); font-weight: bold;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .live-dot { width: 10px; height: 10px; background: var(--f1-red); border-radius: 50%; }
+
+    .chat-log {
+        flex: 1; overflow-y: auto; padding: 15px;
+        display: flex; flex-direction: column; gap: 10px;
+        background: #000; font-family: var(--font-data); font-size: 0.9em;
+    }
+    
+    /* Messages Terminal Style */
+    .msg { padding: 5px 0; border-left: 3px solid transparent; padding-left: 10px; }
+    .msg-coach { border-color: var(--f1-yellow); color: var(--f1-yellow); }
+    .msg-user { border-color: var(--f1-blue); color: var(--f1-blue); text-align: right; border-left: none; border-right: 3px solid var(--f1-blue); padding-right: 10px; }
+    .msg-meta { font-weight: bold; margin-right: 10px; }
+
+    .controls {
+        padding: 15px; background: var(--panel-header-bg);
+        display: flex; gap: 10px; border-top: 1px solid var(--border-color);
+    }
+    input[type="text"] {
+        flex: 1; background: #111; border: 1px solid #444;
+        color: #fff; padding: 10px; font-family: var(--font-main);
+        outline: none;
+    }
+    input:focus { border-color: var(--f1-blue); }
+    
+    .btn-flat {
+        background: #333; border: none; color: #fff;
+        padding: 0 15px; font-weight: 700; cursor: pointer; transition: 0.2s;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 3px;
+    }
+    .btn-flat:hover { background: #444; }
+    .btn-send { background: var(--f1-red); }
+    .btn-send:hover { background: #c10500; }
+    .btn-mic.active { background: var(--f1-red); animation: pulseLight 1s infinite; }
+    
+    /* Bouton Graphique Spécial */
+    .btn-graph { color: var(--f1-green); border: 1px solid #333; }
+    .btn-graph:hover { border-color: var(--f1-green); background: rgba(0, 210, 190, 0.1); }
+    .btn-graph.active { background: var(--f1-green); color: #000; }
+
+    /* --- CENTER: DASHBOARD GRID --- */
+    /* On force la position pour pouvoir superposer le graphique */
+    .dashboard-center {
+        grid-column: 2 / 3; 
+        grid-row: 2 / 3;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 15px;
+    }
+
+    /* --- CENTER: GRAPH VIEW (Hidden by default) --- */
+    .telemetry-view {
+        grid-column: 2 / 3;
+        grid-row: 2 / 3;
+        background: #000;
+        border: 1px solid var(--border-color);
+        display: none; /* Caché par défaut */
+        flex-direction: column;
+    }
+    
+    .telemetry-view iframe {
+        width: 100%; height: 100%; border: none;
+    }
+
+    .widget {
+        background: var(--panel-bg); border: 1px solid var(--border-color);
+        position: relative; padding-top: 30px;
+    }
+    .widget-label {
+        position: absolute; top: 0; left: 0; width: 100%;
+        background: var(--panel-header-bg); padding: 5px 15px;
+        font-size: 0.8em; font-weight: 700; color: var(--text-dim); letter-spacing: 1px;
+    }
+    
+    .widget-content {
+        height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .data-big { font-family: var(--font-main); font-size: 4.5em; font-weight: 900; line-height: 1; }
+    .data-sub { font-family: var(--font-data); color: var(--text-dim); font-size: 1.1em; margin-top: 10px; }
+    .highlight-g { color: var(--f1-green); }
+    .highlight-r { color: var(--f1-red); }
+
+    /* Pneus Style Technique */
+    .tyres-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 180px;
+    }
+    .tyre-box {
+        background: #111; border: 3px solid #444; padding: 8px;
+        text-align: center;
+    }
+    .tyre-temp { font-family: var(--font-data); font-size: 1.4em; font-weight: bold; display: block; }
+    .tyre-pos { font-size: 0.8em; color: var(--text-dim); font-weight: bold; }
+    
+    /* --- CENTER BOTTOM: CAR STATUS STRIP --- */
+    .car-status-strip {
+        grid-row: 3 / 4; grid-column: 2 / 3;
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;
+    }
+    .status-gauge {
+        background: var(--panel-bg); border: 1px solid var(--border-color);
+        padding: 15px; display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .gauge-label { font-size: 0.8em; color: var(--text-dim); font-weight: 700; }
+    .gauge-val { font-family: var(--font-data); font-size: 2em; font-weight: 700; align-self: flex-end; }
+
+    .bar-bg { height: 8px; background: #111; margin-top: 10px; }
+    .bar-fill { height: 100%; background: var(--f1-yellow); width: 0%; transition: width 0.3s; }
+
+    /* --- RIGHT: DAMAGE TABLE --- */
+    .status-panel { grid-row: 2 / 4; }
+    
+    .component-list {
+        padding: 15px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .component-row {
+        display: flex; justify-content: space-between; align-items: center;
+        background: #111; padding: 10px; border: 1px solid var(--border-color);
+    }
+    .comp-name { font-weight: 700; font-size: 0.9em; }
+    .comp-status {
+        font-family: var(--font-data); font-weight: 700;
+        padding: 4px 8px; background: #333; font-size: 0.8em;
+    }
+    .status-ok { background: var(--f1-green); color: #000; }
+    .status-warn { background: var(--f1-yellow); color: #000; }
+    .status-crit { background: var(--f1-red); color: #fff; animation: blinkCrit 0.5s infinite; }
+
+    /* --- ANIMATIONS & MODAL --- */
+    @keyframes blinkCrit { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    @keyframes pulseLight { 0% { background: var(--f1-red); } 50% { background: #ff4d4d; } 100% { background: var(--f1-red); } }
+    
+    .modal {
+        display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%;
+        background-color: rgba(0,0,0,0.8);
+    }
+    .modal-content {
+        background: var(--panel-bg); margin: 5% auto; padding: 0;
+        width: 500px; border: 2px solid var(--f1-red);
+    }
+    .modal-header { background: var(--f1-red); color: #fff; padding: 15px; font-weight: 900; font-style: italic; }
+    .cmd-list { list-style: none; padding: 20px; margin: 0; }
+    .cmd-list li { padding: 10px 0; border-bottom: 1px solid #333; display: flex; justify-content: space-between; }
+    .cmd-key { color: var(--f1-yellow); font-family: var(--font-data); font-weight: bold; }
+
+  </style>
+</head>
+<body>
+
+<div id="help-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            PITLANE COMMANDS
+            <span class="close-btn" style="float:right; cursor:pointer;">&times;</span>
+        </div>
+        <ul class="cmd-list">
+            <li><span class="cmd-key">"Écart" / "Gap"</span> <span>Temps avec la voiture de devant</span></li>
+            <li><span class="cmd-key">"Position"</span> <span>Classement actuel</span></li>
+            <li><span class="cmd-key">"Pneus" / "Temps"</span> <span>Températures des gommes</span></li>
+            <li><span class="cmd-key">"Graph" / "Courbe"</span> <span>Afficher la télémétrie</span></li>
+            <li><span class="cmd-key">"Dégâts" / "Status"</span> <span>Vérification Ailerons & Moteur</span></li>
+        </ul>
+    </div>
+</div>
+
+<div class="cockpit">
+    <div class="header-info panel">
+        <div class="brand">F1 <span>TEAM</span> CONNECT</div>
+        <div class="telemetry-strip">
+            <div class="telemetry-item"><i class="fas fa-flag"></i> LAP <span id="lbl-lap" class="data-val">0</span>/<span id="lbl-total-laps">--</span></div>
+            <div class="telemetry-item"><i class="fas fa-temperature-high"></i> TRACK <span id="lbl-track-temp" class="data-val">--</span>°C</div>
+            <div class="telemetry-item"><i class="fas fa-cloud"></i> <span id="lbl-weather" class="data-val">LOADING...</span></div>
+        </div>
+    </div>
+
+    <div class="comm-panel panel">
+        <div class="panel-header">
+            <span>RACE ENGINEER RADIO</span>
+            <div class="live-indicator"><div class="live-dot"></div> LIVE</div>
+        </div>
+        <div class="chat-log" id="chatLog">
+            <div class="msg msg-coach">
+                <span class="msg-meta">[ING]</span> Canal radio établi. En attente.
+            </div>
+        </div>
+        <div class="controls">
+            <button id="btn-toggle-graph" class="btn-flat btn-graph" title="Afficher Télémétrie"><i class="fas fa-chart-line"></i></button>
+            
+            <button id="btn-mic" class="btn-flat btn-mic" title="Push-to-Talk"><i class="fas fa-microphone"></i></button>
+            <input type="text" id="userInput" placeholder="Transmettre ordre..." autocomplete="off">
+            <button id="btn-send" class="btn-flat btn-send">TX</button>
+            <button id="btn-help" class="btn-flat" style="color:#aaa;"><i class="fas fa-question"></i></button>
+        </div>
+    </div>
+
+    <div class="dashboard-center" id="widgets-container">
+        <div class="widget">
+            <div class="widget-label">POSITION / GAP AHEAD</div>
+            <div class="widget-content">
+                <div class="data-big" id="val-pos">P--</div>
+                <div class="data-sub">GAP: <span id="val-gap-front" class="highlight-r">--</span> s</div>
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-label">FUEL REMAINING</div>
+            <div class="widget-content">
+                <div class="data-big" id="val-fuel">--.<small>0</small></div>
+                <div class="data-sub" id="fuel-status" class="highlight-g">LAPS</div>
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-label">ERS BATTERY</div>
+            <div class="widget-content">
+                <div class="data-big"><span id="val-ers">--</span><small>%</small></div>
+                <div style="width:80%; margin-top:10px;">
+                    <div class="bar-bg"><div id="bar-ers" class="bar-fill"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="widget">
+            <div class="widget-label">TYRE TEMPERATURES (°C)</div>
+            <div class="widget-content">
+                <div class="tyres-grid">
+                    <div class="tyre-box" id="tyre-fl"><span class="tyre-pos">FL</span><span class="tyre-temp">--</span></div>
+                    <div class="tyre-box" id="tyre-fr"><span class="tyre-pos">FR</span><span class="tyre-temp">--</span></div>
+                    <div class="tyre-box" id="tyre-rl"><span class="tyre-pos">RL</span><span class="tyre-temp">--</span></div>
+                    <div class="tyre-box" id="tyre-rr"><span class="tyre-pos">RR</span><span class="tyre-temp">--</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="telemetry-view" id="graph-container">
+        <iframe src="http://localhost:3000/d-solo/TON_UID/telemetry?orgId=1&panelId=1&refresh=1s&kiosk" width="100%" height="100%"></iframe>
+    </div>
+
+    <div class="car-status-strip">
+        <div class="status-gauge">
+            <span class="gauge-label">ENGINE TEMP.</span>
+            <span class="gauge-val"><span id="val-engine-temp">--</span> °C</span>
+            <div class="bar-bg"><div id="bar-eng-temp" class="bar-fill" style="background:var(--f1-red); width:0%;"></div></div>
+        </div>
+        <div class="status-gauge">
+            <span class="gauge-label">DRS STATE</span>
+            <span class="gauge-val" id="val-drs" style="color:#444;">OFF</span>
+        </div>
+        <div class="status-gauge" style="background: #2a2a2a;">
+            <span class="gauge-label">SPEED TRAP</span>
+            <span class="gauge-val" style="color:var(--f1-blue);"><span id="val-speed">0</span> KMH</span>
+        </div>
+    </div>
+
+    <div class="status-panel panel">
+        <div class="panel-header">COMPONENT INTEGRITY</div>
+        <div class="component-list">
+            <div class="component-row">
+                <span class="comp-name">AILERON AV. GAUCHE</span>
+                <span id="status-fl" class="comp-status status-ok">OK</span>
+            </div>
+            <div class="component-row">
+                <span class="comp-name">AILERON AV. DROIT</span>
+                <span id="status-fr" class="comp-status status-ok">OK</span>
+            </div>
+            <div class="component-row">
+                <span class="comp-name">AILERON ARRIÈRE</span>
+                <span id="status-rw" class="comp-status status-ok">OK</span>
+            </div>
+            <div class="component-row">
+                <span class="comp-name">UNITÉ DE PUISSANCE</span>
+                <span id="status-eng" class="comp-status status-ok">OK</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const socket = io("http://" + document.domain + ":" + location.port);
+    const chatLog = document.getElementById('chatLog');
+    
+    // UI Elements
+    const modal = document.getElementById("help-modal");
+    document.getElementById("btn-help").onclick = () => modal.style.display = "block";
+    document.getElementsByClassName("close-btn")[0].onclick = () => modal.style.display = "none";
+    window.onclick = (e) => { if(e.target == modal) modal.style.display = "none"; }
+
+    // --- LOGIQUE TOGGLE GRAPHIQUE ---
+    const btnGraph = document.getElementById('btn-toggle-graph');
+    const widgetsContainer = document.getElementById('widgets-container');
+    const graphContainer = document.getElementById('graph-container');
+    let isGraphVisible = false;
+
+    function toggleGraph() {
+        isGraphVisible = !isGraphVisible;
+        if (isGraphVisible) {
+            widgetsContainer.style.display = 'none';
+            graphContainer.style.display = 'flex';
+            btnGraph.classList.add('active');
+            btnGraph.innerHTML = '<i class="fas fa-th-large"></i>'; // Icône "Retour Widgets"
+        } else {
+            widgetsContainer.style.display = 'grid';
+            graphContainer.style.display = 'none';
+            btnGraph.classList.remove('active');
+            btnGraph.innerHTML = '<i class="fas fa-chart-line"></i>'; // Icône "Graphique"
+        }
+    }
+    btnGraph.onclick = toggleGraph;
+
+    // State
+    const GameState = {
+        playerIndex: 0,
+        me: { pos: 0, lap: 0 },
+        weather: 0
+    };
+    const WeatherMap = ["Sec", "Sec", "Humide", "Pluie Légère", "Pluie", "Orage"];
+
+    // Socket Handling
+    socket.on('packet_1', d => {
+        GameState.weather = d.weather;
+        document.getElementById('lbl-weather').innerText = WeatherMap[d.weather] || "N/A";
+        document.getElementById('lbl-track-temp').innerText = d.track_temperature;
+        document.getElementById('lbl-total-laps').innerText = d.total_laps;
+    });
+
+    socket.on('packet_4', d => { GameState.header.player_car_index = d.header.player_car_index; });
+    // Note: Petite correction sur playerIndex si ce n'est pas initialisé
+    socket.on('packet_4', d => { GameState.playerIndex = d.header.player_car_index; });
+
+    socket.on('packet_2', d => {
+        const my = d.lap_data[GameState.playerIndex];
+        GameState.me.pos = my.car_position;
+        
+        document.getElementById('lbl-lap').innerText = my.current_lap_num;
+        const posElem = document.getElementById('val-pos');
+        posElem.innerText = "P" + my.car_position;
+        posElem.style.color = my.car_position === 1 ? "var(--f1-yellow)" : "#fff";
+        
+        let gapText = "LEADER";
+        let gapColor = "var(--f1-green)";
+        if (my.car_position > 1) {
+            const target = my.car_position - 1;
+            // Recherche simplifiée (pourrait être plus robuste en cherchant l'index exact)
+            const front = d.lap_data.find(c => c.car_position === target);
+            if(front) {
+                const gap = (front.total_distance - my.total_distance) / 60; // Approx
+                if(gap > 0 && gap < 30) {
+                    gapText = gap.toFixed(1) + " s";
+                    gapColor = "var(--f1-red)";
+                } else {
+                     gapText = "+30 s";
+                }
+            }
+        }
+        const gapElem = document.getElementById('val-gap-front');
+        gapElem.innerText = gapText;
+        gapElem.style.color = gapColor;
+    });
+
+    socket.on('packet_6', d => {
+        const t = d.car_telemetry_data[GameState.playerIndex];
+        document.getElementById('val-speed').innerText = t.speed;
+        document.getElementById('val-engine-temp').innerText = t.engine_temperature;
+        
+        const tempPct = Math.min((t.engine_temperature / 130) * 100, 100);
+        document.getElementById('bar-eng-temp').style.width = tempPct + "%";
+
+        const drs = document.getElementById('val-drs');
+        drs.innerText = t.drs ? "OPEN" : "CLOSED";
+        drs.style.color = t.drs ? "var(--f1-green)" : "#444";
+    });
+
+    socket.on('packet_7', d => {
+        const s = d.car_status_data[GameState.playerIndex];
+        const fuel = s.fuel_remaining_laps.toFixed(1);
+        const ers = Math.round((s.ers_store_energy / 4000000)*100);
+        
+        document.getElementById('val-fuel').innerHTML = fuel.split('.')[0] + ".<small>" + fuel.split('.')[1] + "</small>";
+        document.getElementById('val-ers').innerText = ers;
+        document.getElementById('bar-ers').style.width = ers + "%";
+        
+        const fStat = document.getElementById('fuel-status');
+        if(fuel < 1.5) { fStat.innerText = "LOW FUEL"; fStat.style.color = "var(--f1-red)"; }
+        else { fStat.innerText = "LAPS OK"; fStat.style.color = "var(--f1-green)"; }
+    });
+
+    socket.on('packet_10', d => {
+        const dmg = d.car_damage_data[GameState.playerIndex];
+        
+        updateTyre('tyre-rl', dmg.tyres_inner_temperature[0]);
+        updateTyre('tyre-rr', dmg.tyres_inner_temperature[1]);
+        updateTyre('tyre-fl', dmg.tyres_inner_temperature[2]);
+        updateTyre('tyre-fr', dmg.tyres_inner_temperature[3]);
+
+        updateStatus('status-fl', dmg.front_left_wing_damage);
+        updateStatus('status-fr', dmg.front_right_wing_damage);
+        updateStatus('status-rw', dmg.rear_wing_damage);
+        updateStatus('status-eng', dmg.engine_damage);
+    });
+
+    function updateTyre(id, temp) {
+        const el = document.getElementById(id);
+        el.querySelector('.tyre-temp').innerText = temp;
+        let color = "var(--f1-green)";
+        if(temp < 85) color = "var(--f1-blue)";
+        else if (temp > 105) color = "var(--f1-red)";
+        el.style.borderColor = color;
+        el.querySelector('.tyre-temp').style.color = color;
+    }
+
+    function updateStatus(id, val) {
+        const el = document.getElementById(id);
+        el.className = "comp-status"; 
+        if(val > 50) { el.classList.add('status-crit'); el.innerText = "CRITIQUE"; }
+        else if(val > 0) { el.classList.add('status-warn'); el.innerText = "DÉGÂTS"; }
+        else { el.classList.add('status-ok'); el.innerText = "OK"; }
+    }
+
+    // --- CHAT & VOICE ---
+    function addMsg(text, sender) {
+        const div = document.createElement('div');
+        div.className = `msg msg-${sender}`;
+        div.innerHTML = `<span class="msg-meta">[${sender === 'coach' ? 'ING' : 'PIL'}]</span>${text}`;
+        chatLog.appendChild(div);
+        chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function speak(text) {
+        if('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = 'fr-FR'; u.rate = 1.15; u.pitch = 0.9;
+            window.speechSynthesis.speak(u);
+        }
+    }
+
+    function processCmd(cmd) {
+        cmd = cmd.toLowerCase();
+        let resp = "Répétez la demande.";
+        
+        // J'ai ajouté la commande vocale "Graphique"
+        if(cmd.includes('graph') || cmd.includes('courbe') || cmd.includes('télémétrie')) {
+             toggleGraph();
+             resp = isGraphVisible ? "Affichage de la télémétrie." : "Retour aux données principales.";
+        }
+        else if(cmd.includes('écart') || cmd.includes('gap')) {
+            const g = document.getElementById('val-gap-front').innerText;
+            resp = g === 'LEADER' ? "Tu es le leader." : `L'écart est de ${g}`;
+        }
+        else if(cmd.includes('position')) resp = `Position actuelle P ${GameState.me.pos}.`;
+        else if(cmd.includes('fuel') || cmd.includes('essence')) resp = `Il reste ${document.getElementById('val-fuel').innerText} tours de carburant.`;
+        else if(cmd.includes('dégât') || cmd.includes('status')) {
+            const warn = document.querySelectorAll('.status-warn, .status-crit').length;
+            resp = warn > 0 ? "Dégâts confirmés sur la voiture. Vérifiez le panneau." : "Tous les systèmes sont nominaux. Voiture OK.";
+        }
+        else if(cmd.includes('radio')) resp = "Radio OK. Fort et clair.";
+        else if(cmd.includes('box')) resp = "Reçu. Box box ce tour-ci. Confirme.";
+        
+        addMsg(resp, 'coach');
+        speak(resp);
+    }
+
+    const btnSend = document.getElementById('btn-send');
+    const input = document.getElementById('userInput');
+    const mic = document.getElementById('btn-mic');
+
+    btnSend.onclick = () => { if(input.value){ addMsg(input.value, 'user'); processCmd(input.value); input.value=''; }};
+    input.onkeypress = (e) => { if(e.key === 'Enter') btnSend.click(); };
+
+    const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(Speech) {
+        const rec = new Speech(); rec.lang = 'fr-FR';
+        mic.onclick = () => rec.start();
+        rec.onstart = () => mic.classList.add('active');
+        rec.onend = () => mic.classList.remove('active');
+        rec.onresult = e => {
+            const t = e.results[0][0].transcript;
+            addMsg(t, 'user'); processCmd(t);
+        };
+    }
+</script>
+</body>
+</html>
